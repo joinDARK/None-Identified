@@ -1,11 +1,15 @@
+using System.Collections;
 using UnityEditor;
 using UnityEngine;
 
 public class Shooting : MonoBehaviour
 {
     [SerializeField] GameObject _weaponMuzzleFlash;
+    [SerializeField] ParticleSystem _weaponMuzzleFlashParticle;
     [SerializeField] AudioClip _weaponShootSFX;
     [SerializeField] AudioSource _weaponAudioSource;
+    [SerializeField] TrailRenderer _trailEffect;
+    [SerializeField] Transform _posGun;
     [SerializeField] private Transform _weaponBarrelLocation;
     [SerializeField] private LayerMask _layerMask; // Слои, которые мы не будем игнорировать
 
@@ -18,7 +22,10 @@ public class Shooting : MonoBehaviour
     [SerializeField] private bool _weaponUseSpreadOn;
     [SerializeField, Min(0)] private float _weaponSpreadFactor = 1f;
 
-    void Update()
+	RaycastHit hit;
+    TrailRenderer trail;
+
+	void Update()
     {
         Shoot();
         Aim();
@@ -26,12 +33,17 @@ public class Shooting : MonoBehaviour
 
     void Shoot() {
         if (Input.GetButtonDown("Fire1")) {
-            RaycastHit hit;
             var direction = _weaponUseSpreadOn ? _weaponBarrelLocation.forward + CalculateSpread() : _weaponBarrelLocation.forward;
             var ray = new Ray(_weaponBarrelLocation.position, direction);
 
-            if (Physics.Raycast(ray, out hit, _weaponRange, _layerMask)) {
-                Debug.Log("Попал =)" + hit.collider);
+			Instantiate(_weaponMuzzleFlashParticle, _posGun.position, Quaternion.identity);
+
+			if (Physics.Raycast(ray, out hit, _weaponRange, _layerMask)) {
+			    trail = Instantiate(_trailEffect, _posGun.position, Quaternion.identity);
+			    StartCoroutine(SpawnTrail());
+
+                if(hit.collider.TryGetComponent(out Enemy enemy))
+                    enemy.TakeDamage(_weaponDamage);
             }
         }
     }
@@ -70,5 +82,24 @@ public class Shooting : MonoBehaviour
 
         Gizmos.color = color;
         Gizmos.DrawSphere(hitPosition, hitPointRadius);
+    }
+
+    private IEnumerator SpawnTrail()
+    {
+        float t = 0;
+        Vector3 startPos = _posGun.position;
+
+        while (t < 1)
+        {
+			trail.transform.position = Vector3.Lerp(_posGun.position, hit.point, t);
+            t += Time.deltaTime / trail.time;
+
+            yield return null;
+        }
+
+        trail.transform.position = hit.point;
+        // Добавить эффект пули попадания
+        //Instantiate();
+
     }
 }
